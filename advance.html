@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Excel → ICS Converter</title>
+  <style>
+    body {font-family: system-ui, sans-serif; background:#f8fafc; margin:20px; color:#0f172a;}
+    .card {background:#fff; border-radius:16px; padding:20px; box-shadow:0 2px 12px rgba(0,0,0,0.08); max-width:1000px; margin:auto;}
+    h1 {font-size:20px; margin:0 0 12px;}
+    .muted {color:#64748b; font-size:13px;}
+
+    .upload-box {border:2px dashed #94a3b8; border-radius:12px; padding:20px; text-align:center; cursor:pointer; transition:.2s;}
+    .upload-box.dragover {border-color:#2563eb; background:#eff6ff;}
+    .file-info {display:flex; align-items:center; gap:8px; font-size:14px; color:#334155; margin-left:16px;}
+    .file-info img {width:20px; height:20px;}
+    .file-name {overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:360px;}
+
+    .actions {display:flex; align-items:center; justify-content:space-between; margin-top:14px; position:relative;}
+    .btn {background:#2563eb; color:#fff; border:0; padding:8px 14px; border-radius:8px; cursor:pointer; font-weight:600; display:flex; align-items:center; gap:6px;}
+    .btn:disabled {background:#94a3b8; cursor:not-allowed;}
+    .settings-btn {background:#f1f5f9; border:1px solid #cbd5e1; padding:6px 12px; border-radius:8px; cursor:pointer; font-weight:500; display:flex; align-items:center; gap:6px;}
+    .settings-btn img {width:18px; height:18px;}
+
+    .settings-panel {
+      position:absolute; 
+      right:0; 
+      top:120%; 
+      width:330px; 
+      background:#fff; 
+      border:1px solid #e2e8f0; 
+      border-radius:12px; 
+      box-shadow:0 4px 16px rgba(0,0,0,0.15); 
+      padding:16px; 
+      display:none; 
+      z-index:100;
+    }
+    .settings-panel label {display:block; font-size:13px; color:#475569; margin:8px 0 4px;}
+    .form-control {width:100%; padding:6px; border:1px solid #cbd5e1; border-radius:6px; font-size:14px;}
+    .panel-actions {display:flex; justify-content:space-between; margin-top:12px;}
+    .btn-reset {background:#e2e8f0; color:#0f172a;}
+
+    table {width:100%; border-collapse:collapse; margin-top:16px; font-size:13px;}
+    th,td {padding:8px; border-bottom:1px solid #e2e8f0; text-align:left;}
+    th {background:#f1f5f9;}
+    pre {background:#0b1220; color:#e2e8f0; padding:12px; border-radius:8px; margin-top:14px; overflow:auto;}
+  </style>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+</head>
+<body>
+  <div class="card">
+    <h1>Excel → ICS Converter</h1>
+    <p class="muted">Required columns: <strong>Subject</strong>, <strong>StartDate</strong>, <strong>StartTime</strong>, <strong>EndTime</strong>, <strong>Location</strong>, <strong>Description</strong>.</p>
+
+    <div id="uploadBox" class="upload-box">
+      <div>☁️ <strong>Drag & Drop</strong> Excel file here</div>
+      <div class="muted">or click to browse</div>
+      <input id="fileInput" type="file" accept=".xlsx,.xls" style="display:none" />
+    </div>
+
+    <div class="actions">
+      <div style="display:flex; align-items:center;">
+        <button id="downloadBtn" class="btn" disabled>Convert & Download .ics</button>
+        <div id="fileInfo" class="file-info" style="display:none">
+          <img src="c:\Users\kirik\Downloads\9040455_filetype_xlsx_icon.svg" alt="Excel" />  
+          <span class="file-name" id="fileDetails"></span>
+        </div>
+      </div>
+      <button id="settingsBtn" class="settings-btn">
+        <img src="c:\Users\kirik\Downloads\reminder-setting.svg" alt="Settings" />
+        Setting <img src="c:\Users\kirik\Downloads\chevron-down.svg" alt="Settings" />
+      </button>
+      <div id="settingsPanel" class="settings-panel">
+        <label>Reminder (minutes before)</label>
+        <input id="reminderInput" class="form-control" type="number" min="10" max="60" value="15" />
+        <label style="margin-top:10px;">Time Zone</label>
+        <select id="tzSelect" class="form-control">
+          <option value="+7" selected>UTC+7 — Phnom Penh, Bangkok, Jakarta</option>
+          <option value="0">UTC+0 — London</option>
+          <option value="+1">UTC+1 — Paris, Berlin</option>
+          <option value="-5">UTC-5 — New York</option>
+          <option value="-8">UTC-8 — Los Angeles</option>
+          <option value="+8">UTC+8 — Singapore, Beijing</option>
+          <option value="+9">UTC+9 — Tokyo</option>
+          <option value="+10">UTC+10 — Sydney</option>
+        </select>
+        <div class="panel-actions">
+          <button id="resetBtn" class="btn btn-reset" type="button">Reset</button>
+          <button id="applyBtn" class="btn" type="button">Apply</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="previewWrap" style="margin-top:20px; display:none;">
+      <div class="muted">Preview (first 10 rows)</div>
+      <table>
+        <thead>
+          <tr><th>Subject</th><th>Date</th><th>Start Time</th><th>End Time</th><th>Location</th><th>Description</th></tr>
+        </thead>
+        <tbody id="tbody"></tbody>
+      </table>
+    </div>
+
+    <pre id="log">Waiting for file…</pre>
+  </div>
+
+<script>
+const fileInput=document.getElementById('fileInput');
+const uploadBox=document.getElementById('uploadBox');
+const fileInfo=document.getElementById('fileInfo');
+const fileDetails=document.getElementById('fileDetails');
+const tbody=document.getElementById('tbody');
+const previewWrap=document.getElementById('previewWrap');
+const logEl=document.getElementById('log');
+const downloadBtn=document.getElementById('downloadBtn');
+const settingsBtn=document.getElementById('settingsBtn');
+const settingsPanel=document.getElementById('settingsPanel');
+const reminderInput=document.getElementById('reminderInput');
+const tzSelect=document.getElementById('tzSelect');
+const applyBtn=document.getElementById('applyBtn');
+const resetBtn=document.getElementById('resetBtn');
+
+let currentFile=null;
+
+uploadBox.addEventListener('click',()=>{fileInput.value=''; fileInput.click();});
+['dragenter','dragover'].forEach(e=>uploadBox.addEventListener(e,ev=>{ev.preventDefault(); uploadBox.classList.add('dragover');}));
+['dragleave','drop'].forEach(e=>uploadBox.addEventListener(e,ev=>{ev.preventDefault(); uploadBox.classList.remove('dragover');}));
+uploadBox.addEventListener('drop',ev=>{const f=ev.dataTransfer.files[0]; if(f) setFile(f);});
+fileInput.addEventListener('change',()=>{if(fileInput.files.length) setFile(fileInput.files[0]);});
+
+function setFile(file){
+  currentFile=file;
+  if(file){
+    const sizeKB=(file.size/1024).toFixed(1);
+    fileDetails.textContent=truncateFileName(file.name,30)+" ("+sizeKB+" KB)";
+    fileInfo.style.display='flex';
+    downloadBtn.disabled=false;
+    buildPreview();
+  } else {
+    fileInfo.style.display='none';
+    downloadBtn.disabled=true;
+  }
+}
+function truncateFileName(name,max){
+  if(name.length<=max) return name;
+  const half=Math.floor((max-3)/2);
+  return name.slice(0,half)+'...'+name.slice(-half);
+}
+settingsBtn.addEventListener('click',()=>{settingsPanel.style.display=settingsPanel.style.display==='block'?'none':'block';});
+applyBtn.addEventListener('click',()=>{settingsPanel.style.display='none'; buildPreview();});
+resetBtn.addEventListener('click',()=>{reminderInput.value=15; tzSelect.value='+7'; buildPreview();});
+document.addEventListener('click',e=>{if(!settingsPanel.contains(e.target)&&!settingsBtn.contains(e.target)){settingsPanel.style.display='none';}});
+reminderInput.addEventListener('input',()=>buildPreview());
+tzSelect.addEventListener('change',()=>buildPreview());
+
+async function loadRows(){const data=await currentFile.arrayBuffer(); const wb=XLSX.read(data,{type:'array'}); const sheet=wb.Sheets[wb.SheetNames[0]]; return XLSX.utils.sheet_to_json(sheet,{defval:''});}
+function pad(n){return String(n).padStart(2,'0');}
+function parseDateCell(cell){if(cell===''||cell==null) return null; if(typeof cell==='number'){const days=Math.floor(cell); const base=Date.UTC(1899,11,30); const ms=base+days*86400000; const d=new Date(ms); const frac=cell-days; return {y:d.getUTCFullYear(),m:d.getUTCMonth()+1,day:d.getUTCDate(),frac:frac};} const dd=new Date(cell); if(!isNaN(dd.getTime())) return {y:dd.getFullYear(),m:dd.getMonth()+1,day:dd.getDate(),timeFromDate:{H:dd.getHours(),M:dd.getMinutes(),S:dd.getSeconds()}}; return null;}
+function parseTimeCell(cell){if(cell===''||cell==null) return null; if(typeof cell==='number'){const frac=cell%1; const seconds=Math.round(86400*frac); return {H:Math.floor(seconds/3600),M:Math.floor((seconds%3600)/60),S:seconds%60};} if(typeof cell==='string'){const m=cell.trim().match(/^(\\d{1,2}):(\\d{2})(?::(\\d{2}))?\\s*(AM|PM)?$/i); if(m){let H=parseInt(m[1],10),M=parseInt(m[2]||'0',10),S=parseInt(m[3]||'0',10);const ap=(m[4]||'').toUpperCase(); if(ap==='AM'&&H===12)H=0; if(ap==='PM'&&H<12)H+=12; return {H,M,S};} const dd=new Date(cell); if(!isNaN(dd.getTime())) return {H:dd.getHours(),M:dd.getMinutes(),S:dd.getSeconds()};} return null;}
+function toUTCString(y,m,d,H,M,S,offsetMinutes){const ms=Date.UTC(y,m-1,d,H,M,S)-(offsetMinutes*60000); return new Date(ms).toISOString().replace(/[-:]/g,'').split('.')[0]+'Z';}
+function escapeHTML(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+function escapeICS(t){if(t==null) return ''; return String(t).replace(/\\\\/g,'\\\\\\\\').replace(/\\n/g,'\\\\n').replace(/,/g,'\\\\,').replace(/;/g,'\\\\;');}
+function slugify(s){return String(s||'event').toLowerCase().replace(/[^a-z0-9]+/g,'').slice(0,32);}
+function formatLocalTime(H,M){const ap=H>=12?'PM':'AM'; const hh=(H%12)||12; return `${pad(hh)}:${pad(M)} ${ap}`;}
+
+async function buildPreview(){
+  if(!currentFile) return;
+  const rows=await loadRows();
+  tbody.innerHTML='';
+  if(!rows.length){previewWrap.style.display='none';return;}
+  const offset=Math.round(parseFloat(tzSelect.value)*60);
+  rows.slice(0,10).forEach(row=>{
+    const dateCell=parseDateCell(row.StartDate); if(!dateCell) return;
+    let tStart=parseTimeCell(row.StartTime)||{H:0,M:0,S:0};
+    let tEnd=parseTimeCell(row.EndTime)||{H:(tStart.H+1)%24,M:tStart.M,S:tStart.S};
+    const tr=document.createElement('tr');
+    tr.innerHTML=`<td>${escapeHTML(row.Subject||'')}</td>
+                  <td>${pad(dateCell.day)} ${['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][dateCell.m-1]} ${dateCell.y}</td>
+                  <td>${formatLocalTime(tStart.H,tStart.M)}</td>
+                  <td>${formatLocalTime(tEnd.H,tEnd.M)}</td>
+                  <td>${escapeHTML(row.Location||'')}</td>
+                  <td>${escapeHTML(row.Description||'')}</td>`;
+    tbody.appendChild(tr);
+  });
+  previewWrap.style.display='block';
+  logEl.textContent=`Preview built — Reminder ${reminderInput.value} min, Timezone ${tzSelect.options[tzSelect.selectedIndex].text}`;
+}
+
+downloadBtn.addEventListener('click',async()=>{
+  try{
+    let reminder=parseInt(reminderInput.value,10);
+    if(isNaN(reminder)||reminder<10||reminder>60){reminder=15; reminderInput.value=15;}
+    const rows=await loadRows(); const offset=Math.round(parseFloat(tzSelect.value)*60);
+    const lines=['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//TechEd Cambodia//EN','CALSCALE:GREGORIAN','METHOD:PUBLISH'];
+    const dtstamp=new Date().toISOString().replace(/[-:]/g,'').split('.')[0]+'Z';
+    rows.forEach((row,i)=>{
+      const title=row.Subject||`Event ${i+1}`; const desc=row.Description||''; const loc=row.Location||'';
+      const dateCell=parseDateCell(row.StartDate); if(!dateCell) return;
+      let tStart=parseTimeCell(row.StartTime); if(!tStart){ if(typeof row.StartDate==='number'&&dateCell.frac){const seconds=Math.round(86400*dateCell.frac);tStart={H:Math.floor(seconds/3600),M:Math.floor((seconds%3600)/60),S:seconds%60};} else if(dateCell.timeFromDate){tStart=dateCell.timeFromDate;} else {tStart={H:0,M:0,S:0};} }
+      let tEnd=parseTimeCell(row.EndTime); if(!tEnd){const tmp=new Date(Date.UTC(dateCell.y,dateCell.m-1,dateCell.day,tStart.H,tStart.M)); tmp.setUTCHours(tmp.getUTCHours()+1); tEnd={H:tmp.getUTCHours(),M:tmp.getUTCMinutes(),S:tmp.getUTCSeconds()};}
+      const DTSTART=toUTCString(dateCell.y,dateCell.m,dateCell.day,tStart.H,tStart.M,tStart.S||0,offset);
+      const DTEND=toUTCString(dateCell.y,dateCell.m,dateCell.day,tEnd.H,tEnd.M,tEnd.S||0,offset);
+      const uid=`${DTSTART}-${slugify(title)}@teched`;
+      lines.push('BEGIN:VEVENT',`UID:${uid}`,`DTSTAMP:${dtstamp}`,`DTSTART:${DTSTART}`,`DTEND:${DTEND}`,`SUMMARY:${escapeICS(title)}`);
+      if(loc) lines.push(`LOCATION:${escapeICS(loc)}`);
+      if(desc) lines.push(`DESCRIPTION:${escapeICS(desc)}`);
+      lines.push('BEGIN:VALARM',`TRIGGER:-PT${reminder}M`,'ACTION:DISPLAY','DESCRIPTION:Reminder','END:VALARM','END:VEVENT');
+    });
+    lines.push('END:VCALENDAR');
+    const ics=lines.join('\r\n')+'\r\n'; const blob=new Blob([ics],{type:'text/calendar;charset=utf-8'}); const url=URL.createObjectURL(blob);
+    const a=document.createElement('a'); a.href=url; a.download='calendar.ics'; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+    logEl.textContent=`ICS downloaded — Reminder ${reminder} min, Timezone ${tzSelect.options[tzSelect.selectedIndex].text}`;
+  }catch(err){console.error(err); logEl.textContent='Error generating ICS';}
+});
+</script>
+</body>
+</html>
