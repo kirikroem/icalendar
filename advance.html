@@ -40,9 +40,16 @@
     .panel-actions {display:flex; justify-content:space-between; margin-top:12px;}
     .btn-reset {background:#e2e8f0; color:#0f172a;}
 
-    table {width:100%; border-collapse:collapse; margin-top:16px; font-size:13px;}
-    th,td {padding:8px; border-bottom:1px solid #e2e8f0; text-align:left;}
+    table {width:100%; border-collapse:collapse; margin-top:16px; font-size:13px; table-layout:fixed;}
+    th,td {padding:8px; border-bottom:1px solid #e2e8f0; text-align:left; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
     th {background:#f1f5f9;}
+    th:nth-child(1), td:nth-child(1) {width:180px;} /* Subject */
+    th:nth-child(2), td:nth-child(2) {width:120px;} /* Date */
+    th:nth-child(3), td:nth-child(3),
+    th:nth-child(4), td:nth-child(4) {width:90px;} /* Times */
+    th:nth-child(5), td:nth-child(5) {width:160px;} /* Location */
+    th:nth-child(6), td:nth-child(6) {width:200px;} /* Description */
+
     pre {background:#0b1220; color:#e2e8f0; padding:12px; border-radius:8px; margin-top:14px; overflow:auto;}
   </style>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -62,13 +69,13 @@
       <div style="display:flex; align-items:center;">
         <button id="downloadBtn" class="btn" disabled>Convert & Download .ics</button>
         <div id="fileInfo" class="file-info" style="display:none">
-          <img src="images/9040455_filetype_xlsx_icon.svg" alt="Excel" />  
+          <img src="c:\Users\kirik\Downloads\9040455_filetype_xlsx_icon.svg" alt="Excel" />  
           <span class="file-name" id="fileDetails"></span>
         </div>
       </div>
       <button id="settingsBtn" class="settings-btn">
-        <img src="images/reminder-setting.svg" alt="Settings" />
-        Setting <img src="images/chevron-down.svg" alt="Settings" />
+        <img src="c:\Users\kirik\Downloads\reminder-setting.svg" alt="Settings" />
+        Setting <img src="c:\Users\kirik\Downloads\chevron-down.svg" alt="Settings" />
       </button>
       <div id="settingsPanel" class="settings-panel">
         <label>Reminder (minutes before)</label>
@@ -156,10 +163,10 @@ tzSelect.addEventListener('change',()=>buildPreview());
 async function loadRows(){const data=await currentFile.arrayBuffer(); const wb=XLSX.read(data,{type:'array'}); const sheet=wb.Sheets[wb.SheetNames[0]]; return XLSX.utils.sheet_to_json(sheet,{defval:''});}
 function pad(n){return String(n).padStart(2,'0');}
 function parseDateCell(cell){if(cell===''||cell==null) return null; if(typeof cell==='number'){const days=Math.floor(cell); const base=Date.UTC(1899,11,30); const ms=base+days*86400000; const d=new Date(ms); const frac=cell-days; return {y:d.getUTCFullYear(),m:d.getUTCMonth()+1,day:d.getUTCDate(),frac:frac};} const dd=new Date(cell); if(!isNaN(dd.getTime())) return {y:dd.getFullYear(),m:dd.getMonth()+1,day:dd.getDate(),timeFromDate:{H:dd.getHours(),M:dd.getMinutes(),S:dd.getSeconds()}}; return null;}
-function parseTimeCell(cell){if(cell===''||cell==null) return null; if(typeof cell==='number'){const frac=cell%1; const seconds=Math.round(86400*frac); return {H:Math.floor(seconds/3600),M:Math.floor((seconds%3600)/60),S:seconds%60};} if(typeof cell==='string'){const m=cell.trim().match(/^(\\d{1,2}):(\\d{2})(?::(\\d{2}))?\\s*(AM|PM)?$/i); if(m){let H=parseInt(m[1],10),M=parseInt(m[2]||'0',10),S=parseInt(m[3]||'0',10);const ap=(m[4]||'').toUpperCase(); if(ap==='AM'&&H===12)H=0; if(ap==='PM'&&H<12)H+=12; return {H,M,S};} const dd=new Date(cell); if(!isNaN(dd.getTime())) return {H:dd.getHours(),M:dd.getMinutes(),S:dd.getSeconds()};} return null;}
+function parseTimeCell(cell){if(cell===''||cell==null) return null; if(typeof cell==='number'){const frac=cell%1; const seconds=Math.round(86400*frac); return {H:Math.floor(seconds/3600),M:Math.floor((seconds%3600)/60),S:seconds%60};} if(typeof cell==='string'){const m=cell.trim().match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?\s*(AM|PM)?$/i); if(m){let H=parseInt(m[1],10),M=parseInt(m[2]||'0',10),S=parseInt(m[3]||'0',10);const ap=(m[4]||'').toUpperCase(); if(ap==='AM'&&H===12)H=0; if(ap==='PM'&&H<12)H+=12; return {H,M,S};} const dd=new Date(cell); if(!isNaN(dd.getTime())) return {H:dd.getHours(),M:dd.getMinutes(),S:dd.getSeconds()};} return null;}
 function toUTCString(y,m,d,H,M,S,offsetMinutes){const ms=Date.UTC(y,m-1,d,H,M,S)-(offsetMinutes*60000); return new Date(ms).toISOString().replace(/[-:]/g,'').split('.')[0]+'Z';}
 function escapeHTML(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
-function escapeICS(t){if(t==null) return ''; return String(t).replace(/\\\\/g,'\\\\\\\\').replace(/\\n/g,'\\\\n').replace(/,/g,'\\\\,').replace(/;/g,'\\\\;');}
+function escapeICS(t){if(t==null) return ''; return String(t).replace(/\\/g,'\\\\').replace(/\n/g,'\\n').replace(/,/g,'\\,').replace(/;/g,'\\;');}
 function slugify(s){return String(s||'event').toLowerCase().replace(/[^a-z0-9]+/g,'').slice(0,32);}
 function formatLocalTime(H,M){const ap=H>=12?'PM':'AM'; const hh=(H%12)||12; return `${pad(hh)}:${pad(M)} ${ap}`;}
 
@@ -174,12 +181,12 @@ async function buildPreview(){
     let tStart=parseTimeCell(row.StartTime)||{H:0,M:0,S:0};
     let tEnd=parseTimeCell(row.EndTime)||{H:(tStart.H+1)%24,M:tStart.M,S:tStart.S};
     const tr=document.createElement('tr');
-    tr.innerHTML=`<td>${escapeHTML(row.Subject||'')}</td>
+    tr.innerHTML=`<td title="${row.Subject||''}">${escapeHTML(row.Subject||'')}</td>
                   <td>${pad(dateCell.day)} ${['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][dateCell.m-1]} ${dateCell.y}</td>
                   <td>${formatLocalTime(tStart.H,tStart.M)}</td>
                   <td>${formatLocalTime(tEnd.H,tEnd.M)}</td>
-                  <td>${escapeHTML(row.Location||'')}</td>
-                  <td>${escapeHTML(row.Description||'')}</td>`;
+                  <td title="${row.Location||''}">${escapeHTML(row.Location||'')}</td>
+                  <td title="${row.Description||''}">${escapeHTML(row.Description||'')}</td>`;
     tbody.appendChild(tr);
   });
   previewWrap.style.display='block';
