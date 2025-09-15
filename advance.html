@@ -70,13 +70,13 @@
       <div style="display:flex; align-items:center;">
         <button id="downloadBtn" class="btn" disabled>Convert & Download .ics</button>
         <div id="fileInfo" class="file-info" style="display:none">
-          <img src="images\9040455_filetype_xlsx_icon.svg" alt="Excel" />  
+          <img src="c:\Users\kirik\Downloads\9040455_filetype_xlsx_icon.svg" alt="Excel" />  
           <span class="file-name" id="fileDetails"></span>
         </div>
       </div>
       <button id="settingsBtn" class="settings-btn">
-        <img src="images\reminder-setting.svg" alt="Settings" />
-        Setting <img src="images\chevron-down.svg" alt="Settings" />
+        <img src="c:\Users\kirik\Downloads\reminder-setting.svg" alt="Settings" />
+        Setting <img src="c:\Users\kirik\Downloads\chevron-down.svg" alt="Settings" />
       </button>
       <div id="settingsPanel" class="settings-panel">
         <label>Reminder (minutes before)</label>
@@ -167,9 +167,35 @@ function parseDateCell(cell){if(cell===''||cell==null) return null; if(typeof ce
 function parseTimeCell(cell){if(cell===''||cell==null) return null; if(typeof cell==='number'){const frac=cell%1; const seconds=Math.round(86400*frac); return {H:Math.floor(seconds/3600),M:Math.floor((seconds%3600)/60),S:seconds%60};} if(typeof cell==='string'){const m=cell.trim().match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?\s*(AM|PM)?$/i); if(m){let H=parseInt(m[1],10),M=parseInt(m[2]||'0',10),S=parseInt(m[3]||'0',10);const ap=(m[4]||'').toUpperCase(); if(ap==='AM'&&H===12)H=0; if(ap==='PM'&&H<12)H+=12; return {H,M,S};} const dd=new Date(cell); if(!isNaN(dd.getTime())) return {H:dd.getHours(),M:dd.getMinutes(),S:dd.getSeconds()};} return null;}
 function toUTCString(y,m,d,H,M,S,offsetMinutes){const ms=Date.UTC(y,m-1,d,H,M,S)-(offsetMinutes*60000); return new Date(ms).toISOString().replace(/[-:]/g,'').split('.')[0]+'Z';}
 function escapeHTML(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
-function escapeICS(t){if(t==null) return ''; return String(t).replace(/\\/g,'\\\\').replace(/\n/g,'\\n').replace(/,/g,'\\,').replace(/;/g,'\\;');}
+
+// Improved ICS escaping: normalize CR/LF, escape backslashes, encode newlines as \n, escape commas/semicolons.
+// This prevents leftover CR characters from breaking ICS lines (which caused Outlook to show only the first line)
+function escapeICS(t){
+  if(t==null) return '';
+  // Normalize to LF first (handles CRLF and lone CR from Excel Alt+Enter)
+  let s = String(t).replace(/\r\n/g,'\n').replace(/\r/g,'\n');
+  // Escape backslashes (must be first)
+  s = s.replace(/\\/g,'\\\\');
+  // Encode newline characters as literal \n (backslash + n)
+  s = s.replace(/\n/g,'\\n');
+  // Escape commas and semicolons per RFC5545
+  s = s.replace(/,/g,'\\,').replace(/;/g,'\\;');
+  return s;
+}
+
 function slugify(s){return String(s||'event').toLowerCase().replace(/[^a-z0-9]+/g,'').slice(0,32);}
 function formatLocalTime(H,M){const ap=H>=12?'PM':'AM'; const hh=(H%12)||12; return `${pad(hh)}:${pad(M)} ${ap}`;}
+
+// Fold long iCalendar lines per RFC (75 octets) to avoid clients mis-parsing long property lines
+function foldLine(line, maxLen=75){
+  let out = '';
+  while(line.length > maxLen){
+    out += line.slice(0, maxLen) + '\r\n' + ' ';
+    line = line.slice(maxLen);
+  }
+  out += line;
+  return out;
+}
 
 async function buildPreview(){
   if(!currentFile) return;
@@ -215,7 +241,10 @@ downloadBtn.addEventListener('click',async()=>{
       lines.push('BEGIN:VALARM',`TRIGGER:-PT${reminder}M`,'ACTION:DISPLAY','DESCRIPTION:Reminder','END:VALARM','END:VEVENT');
     });
     lines.push('END:VCALENDAR');
-    const ics=lines.join('\r\n')+'\r\n'; const blob=new Blob([ics],{type:'text/calendar;charset=utf-8'}); const url=URL.createObjectURL(blob);
+
+    // Apply folding to long lines (helps Outlook / other clients parse multiline values)
+    const folded = lines.map(l => foldLine(l)).join('\r\n') + '\r\n';
+    const blob=new Blob([folded],{type:'text/calendar;charset=utf-8'}); const url=URL.createObjectURL(blob);
     const a=document.createElement('a'); a.href=url; a.download='calendar.ics'; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
     logEl.textContent=`ICS downloaded — Reminder ${reminder} min, Timezone ${tzSelect.options[tzSelect.selectedIndex].text}`;
   }catch(err){console.error(err); logEl.textContent='Error generating ICS';}
