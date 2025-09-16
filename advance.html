@@ -10,7 +10,8 @@
     .card {background:#fff; border-radius:16px; padding:20px; box-shadow:0 2px 12px rgba(0,0,0,0.08); max-width:1000px; margin:auto;}
     h1 {font-size:20px; margin:0 0 12px;}
     .muted {color:#64748b; font-size:13px;}
-
+    body a {text-decoration: none;}
+    body a:hover {text-decoration: underline;}
     .upload-box {border:2px dashed #94a3b8; border-radius:12px; padding:20px; text-align:center; cursor:pointer; transition:.2s;}
     .upload-box.dragover {border-color:#2563eb; background:#eff6ff;}
     .file-info {display:flex; align-items:center; gap:8px; font-size:14px; color:#334155; margin-left:16px;}
@@ -58,7 +59,7 @@
 <body>
   <div class="card">
     <h1>Excel → ICS Converter</h1>
-    <p class="muted">Required columns: <strong>Subject</strong>, <strong>StartDate</strong>, <strong>StartTime</strong>, <strong>EndTime</strong>, <strong>Location</strong>, <strong>Description</strong>.<a href="files/sample.xlsx"> Download Sample File </a></p>
+    <p class="muted">Required columns: <strong>Subject</strong>, <strong>StartDate</strong>, <strong>StartTime</strong>, <strong>EndTime</strong>, <strong>Location</strong>, <strong>Description</strong>. <a href="files/sample.xlsx">Download Sample File </a></p>
 
     <div id="uploadBox" class="upload-box">
       <div>☁️ <strong>Drag & Drop</strong> Excel file here</div>
